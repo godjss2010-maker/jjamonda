@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAMPION DRAW | 프리미엄 발표자 추첨기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font (Inter & Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'neon-violet': '0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.2)',
+                        'neon-pink': '0 0 20px rgba(236, 72, 153, 0.5), 0 0 40px rgba(236, 72, 153, 0.2)',
+                        'neon-emerald': '0 0 20px rgba(16, 185, 129, 0.5), 0 0 40px rgba(16, 185, 129, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 네온 유동 배경 애니메이션 */
+        body {
+            background: radial-gradient(circle at 50% 50%, #120e2e 0%, #050515 100%);
+            overflow-x: hidden;
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(0,0,0,0) 70%);
+            top: -200px;
+            left: -200px;
+            z-index: 0;
+            pointer-events: none;
+            animation: floatGlow 15s ease-in-out infinite alternate;
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.12) 0%, rgba(0,0,0,0) 70%);
+            bottom: -200px;
+            right: -200px;
+            z-index: 0;
+            pointer-events: none;
+            animation: floatGlow 20s ease-in-out infinite alternate-reverse;
+        }
+
+        @keyframes floatGlow {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(100px, 100px) scale(1.2); }
+        }
+
+        /* 슬롯 회전 드럼 효과 커스텀 스타일 */
+        .slot-window {
+            height: 100px;
+            mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+        }
+
+        .slot-reel {
+            transition: transform 3.5s cubic-bezier(0.12, 0.8, 0.15, 1);
+        }
+
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.6);
+        }
+    </style>
+</head>
+
+<body class="text-slate-100 min-h-screen flex flex-col justify-between relative overflow-hidden">
+    <!-- 백그라운드 앰비언트 광원 -->
+    <div class="ambient-glow"></div>
+    <div class="ambient-glow-2"></div>
+
+    <!-- 네비게이션 헤더 -->
+    <header class="border-b border-slate-800/80 bg-slate-950/40 backdrop-blur-md sticky top-0 z-40 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center shadow-neon-violet">
+                    <i class="fa-solid fa-trophy text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-violet-400 via-pink-400 to-emerald-400 bg-clip-text text-transparent">CHAMPION DRAW</h1>
+                    <p class="text-xs text-slate-400 tracking-widest uppercase">Premium Random Presenter Selector</p>
+                </div>
+            </div>
+            <!-- 사운드 제어 토글 및 리셋 버튼 -->
+            <div class="flex items-center gap-3">
+                <button id="soundToggleBtn" onclick="toggleMute()" class="px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700/60 hover:border-violet-500 transition-all flex items-center gap-2" title="사운드 On/Off">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-violet-400"></i>
+                    <span id="soundText" class="text-xs text-slate-300 hidden sm:inline">사운드 On</span>
+                </button>
+                <button onclick="resetApp()" class="px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700/60 hover:border-pink-500 hover:text-pink-400 transition-all flex items-center gap-2" title="전체 초기화">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span class="text-xs hidden sm:inline">초기화</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8 relative z-10 flex flex-col lg:flex-row gap-8 items-stretch">
+        
+        <!-- 왼쪽 패널: 참가자 및 조건 입력 (컨트롤 타워) -->
+        <section class="w-full lg:w-5/12 flex flex-col gap-6">
+            <div class="bg-slate-900/40 border border-slate-800 backdrop-blur-xl p-6 rounded-2xl flex flex-col gap-5 relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-violet-500 to-pink-500"></div>
+                
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-users text-violet-400 text-lg"></i>
+                        <h2 class="text-lg font-bold">참가자 명단 입력</h2>
+                    </div>
+                    <span id="nameCount" class="text-xs px-2.5 py-1 bg-slate-800/80 rounded-full border border-slate-700/50 text-slate-300 font-semibold">대기 16명</span>
+                </div>
+
+                <!-- 이름 입력 텍스트 에어리어 -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2">줄바꿈(Enter) 또는 쉼표(,)로 구분하여 이름을 작성해 주세요.</label>
+                    <textarea id="namesInput" rows="7" 
+                        class="w-full bg-slate-950/80 border border-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl p-4 text-sm font-medium leading-relaxed text-slate-200 outline-none transition-all placeholder:text-slate-600"
+                        oninput="updateCount()"
+                        placeholder="이곳에 참가자 명단을 입력하세요...&#10;예: 김철수, 이영희, 박지성&#10;또는&#10;정대만&#10;송태섭&#10;강백호"></textarea>
+                </div>
+
+                <!-- 추첨 명수 설정 컨트롤러 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2">추첨할 인원 수</label>
+                        <div class="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1">
+                            <button onclick="changeWinnerCount(-1)" class="w-10 h-10 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-all">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <input type="number" id="winnerCountInput" value="1" min="1" 
+                                class="flex-grow bg-transparent text-center font-bold text-lg text-slate-100 outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                            <button onclick="changeWinnerCount(1)" class="w-10 h-10 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-all">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 추첨 시작 핵심 버튼 -->
+                    <div>
+                        <button onclick="startDrawing()" class="w-full h-12 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 text-white font-extrabold text-md shadow-neon-violet hover:shadow-neon-pink transition-all duration-300 transform active:scale-[0.98] flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-shuffle animate-spin-slow"></i>
+                            무작위 추첨 시작!
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 이력 관리 패널 -->
+            <div class="bg-slate-900/40 border border-slate-800 backdrop-blur-xl p-6 rounded-2xl flex-grow flex flex-col gap-4 max-h-[300px] lg:max-h-none overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                        <h2 class="text-sm font-bold text-slate-300">최근 당첨 이력</h2>
+                    </div>
+                    <button onclick="clearHistory()" class="text-xs text-slate-500 hover:text-pink-400 transition-colors">기록 삭제</button>
+                </div>
+                <div id="historyList" class="flex-grow overflow-y-auto space-y-2 text-sm pr-1">
+                    <!-- 당첨 기록 비어있을 때 메시지 -->
+                    <div id="emptyHistoryMsg" class="h-full flex flex-col items-center justify-center text-slate-600 py-10">
+                        <i class="fa-regular fa-folder-open text-2xl mb-2"></i>
+                        <p class="text-xs">아직 추첨 기록이 없습니다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 오른쪽 패널: 추첨 무대 (애니메이션 대기/진행 영역) -->
+        <section id="arenaPanel" class="w-full lg:w-7/12 flex flex-col justify-center items-center bg-slate-900/20 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl min-h-[400px] relative overflow-hidden">
+            <!-- 그리드 보조 디자인 선 -->
+            <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30"></div>
+
+            <!-- 대기 상태 스크린 -->
+            <div id="stageIdle" class="relative z-10 flex flex-col items-center justify-center text-center p-8 transition-all duration-500">
+                <div class="w-24 h-24 rounded-full bg-slate-950/80 border border-violet-500/30 flex items-center justify-center text-violet-400 text-4xl mb-6 shadow-neon-violet animate-pulse">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h3 class="text-2xl font-black mb-2 tracking-wide bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">추첨 준비 완료!</h3>
+                <p class="text-sm text-slate-400 max-w-md leading-relaxed">참가자 명단을 올바르게 입력하고 하단의 '무작위 추첨 시작!' 버튼을 눌러 긴장감 넘치는 추첨을 시작하세요!</p>
+            </div>
+
+            <!-- 추첨 중 슬롯 스크린 (추첨 시작시 렌더링될 영역) -->
+            <div id="stageDrawing" class="w-full relative z-10 hidden flex-col items-center justify-center gap-6 transition-all duration-500">
+                <div class="text-center">
+                    <span class="text-xs px-3 py-1 bg-violet-950/80 border border-violet-500/30 text-violet-300 rounded-full font-semibold uppercase tracking-widest animate-pulse">Drawing Now</span>
+                    <h3 class="text-xl font-extrabold text-slate-200 mt-2">운명의 주사위가 굴러가고 있습니다...</h3>
+                </div>
+                <!-- 슬롯 머신들이 배치되는 동적 마운트 컨테이너 -->
+                <div id="slotsContainer" class="w-full grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto px-4 py-2">
+                    <!-- Dynamic Slots will be injected here -->
+                </div>
+            </div>
+
+            <!-- 결과 스크린 (추첨 종료시 렌더링될 영역) -->
+            <div id="stageResult" class="w-full relative z-10 hidden flex-col items-center justify-center text-center p-4 transition-all duration-500">
+                <div class="mb-4">
+                    <span class="px-3 py-1 bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 rounded-full font-bold text-xs tracking-wider uppercase animate-bounce">Congratulations</span>
+                </div>
+                <h3 class="text-2xl font-extrabold text-slate-100 mb-6">최종 추첨 발표!</h3>
+                
+                <!-- 최종 당첨 카드 리스트 -->
+                <div id="winnersDisplay" class="flex flex-wrap gap-4 justify-center items-center max-w-full mb-8">
+                    <!-- Winner dynamic cards will be injected here -->
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="restartDrawingSame()" class="px-5 py-2.5 bg-slate-900 border border-slate-700/80 hover:border-violet-500 rounded-xl font-semibold text-xs hover:text-violet-400 transition-all flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-redo"></i>
+                        동일 설정 다시 추첨
+                    </button>
+                    <button onclick="backToIdle()" class="px-5 py-2.5 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl font-semibold text-xs text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-xmark"></i>
+                        닫기
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 사용자 정의 커스텀 토스트 알림 (alert 대체제) -->
+    <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 transform scale-90 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-3 px-6 py-4 rounded-2xl bg-slate-900/95 border border-pink-500 text-slate-100 shadow-[0_0_30px_rgba(236,72,153,0.3)]">
+        <div class="h-8 w-8 bg-pink-500/20 text-pink-500 rounded-xl flex items-center justify-center">
+            <i class="fa-solid fa-circle-exclamation text-lg"></i>
+        </div>
+        <div class="flex flex-col">
+            <span class="text-xs font-semibold text-pink-400">오류 발생</span>
+            <span id="toastMessage" class="text-xs text-slate-200 font-bold mt-0.5">참가자 수가 부족합니다.</span>
+        </div>
+    </div>
+
+    <!-- 하단 푸터 -->
+    <footer class="border-t border-slate-900 bg-slate-950/60 py-4 px-6 relative z-10">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-2">
+            <p>© 2026 CHAMPION DRAW. UI/UX Powered Premium App.</p>
+            <p>※ 마이크 아이콘 클릭으로 긴장되는 긴장 사운드와 대포 팡파르 합성음을 키고 끌 수 있습니다.</p>
+        </div>
+    </footer>
+
+    <!-- JS 스크립트 핵심 로직 -->
+    <script>
+        /**
+         * ==========================================
+         * 1. 사운드 생성 및 제어 엔진 (웹 오디오 API 활용)
+         * ==========================================
+         * 인터넷이 안 되어도, 외부 호스팅 링크가 깨져도 무조건 작동하는
+         * Web Audio API 합성 브라우저 사운드 솔루션입니다.
+         * 만약 커스텀 오디오 파일(MP3 등)을 사용하고자 하시는 경우,
+         * 하단의 Custom Audio 설정을 활용하실 수 있습니다.
+         */
+        const soundState = {
+            muted: false,
+            // 커스텀 MP3 오디오 경로 설정 가이드 (원하는 경우 주석 해제 후 연결)
+            // drumRollAudio: new Audio("https://example.com/drumroll.mp3"),
+            // fanfareAudio: new Audio("https://example.com/fanfare.mp3"),
+            // tickAudio: new Audio("https://example.com/tick.mp3")
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 묵음 전환 처리 함수
+        function toggleMute() {
+            soundState.muted = !soundState.muted;
+            const soundIcon = document.getElementById("soundIcon");
+            const soundText = document.getElementById("soundText");
+            const soundToggleBtn = document.getElementById("soundToggleBtn");
+
+            if (soundState.muted) {
+                soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+                soundText.innerText = "사운드 Off";
+                soundToggleBtn.classList.remove("border-violet-500");
+            } else {
+                soundIcon.className = "fa-solid fa-volume-high text-violet-400";
+                soundText.innerText = "사운드 On";
+                soundToggleBtn.classList.add("border-violet-500");
+                playTickSound(800, 0.05); // 즉각적인 소리 확인 테스트용
+            }
+        }
+
+        // [소리 1: 틱클릭 사운드] 추첨 롤링 중 1회 연주 (주파수 sweep)
+        function playTickSound(freq = 600, duration = 0.08) {
+            if (soundState.muted) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                // 주파수 하강 스윕으로 틱 효과
+                osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + duration);
+
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.warn("오디오 플레이 에러: ", e);
+            }
+        }
+
+        // [소리 2: 팡파르 사운드] 최종 추첨 종료 후 연주
+        function playFanfareSound() {
+            if (soundState.muted) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                const now = audioCtx.currentTime;
+                
+                // 음계를 연주하기 위한 헬퍼 함수
+                const playNote = (freq, startTime, duration, volume = 0.1) => {
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    osc.type = 'sawtooth'; // 브라스(금관악기) 음색과 비슷한 톱니파 사용
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    
+                    // 필터를 추가하여 톱니파의 피로한 고음 영역을 깎고 부드럽게 가공
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(1200, startTime);
+                    
+                    gainNode.gain.setValueAtTime(0, startTime);
+                    gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.04);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                    
+                    osc.connect(filter);
+                    filter.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    osc.start(startTime);
+                    osc.stop(startTime + duration);
+                };
+
+                // 장조 다장조 승전보 코드 전개 (C4 = 261.6Hz, E4 = 329.6Hz, G4 = 392Hz, C5 = 523.3Hz)
+                // 1. 순차 도약
+                playNote(261.63, now, 0.2, 0.08); // C4
+                playNote(329.63, now + 0.15, 0.2, 0.08); // E4
+                playNote(392.00, now + 0.3, 0.2, 0.08); // G4
+                
+                // 2. 단차 롤링 리듬
+                playNote(329.63, now + 0.5, 0.15, 0.08);
+                playNote(392.00, now + 0.65, 0.15, 0.08);
+                
+                // 3. 메인 하모니 화음 폭발 (웅장한 C 메이저 풀 코드)
+                playNote(523.25, now + 0.8, 1.2, 0.15); // C5
+                playNote(392.00, now + 0.8, 1.2, 0.08); // G4
+                playNote(659.25, now + 0.8, 1.2, 0.08); // E5
+            } catch (e) {
+                console.warn("오디오 플레이 에러: ", e);
+            }
+        }
+
+        /**
+         * ==========================================
+         * 2. 기본 상태 변수 정의 및 기본 데이터 세팅
+         * ==========================================
+         */
+        const defaultNames = [
+            "김철수", "이영희", "박민수", "최지우", "정대만", 
+            "강백호", "서태웅", "채치수", "송태섭", "신사임당", 
+            "이순신", "세종대왕", "안중근", "장영실", "허준", "홍길동"
+        ];
+        
+        // 이력 데이터
+        let drawingHistory = [];
+        
+        // 초기화 과정
+        window.onload = function() {
+            // 디폴트 데이터 로딩
+            document.getElementById("namesInput").value = defaultNames.join(", ");
+            updateCount();
+            
+            // 저장된 이력 로드
+            const savedHistory = localStorage.getItem("championDrawHistory");
+            if (savedHistory) {
+                drawingHistory = JSON.parse(savedHistory);
+                renderHistory();
+            }
+        };
+
+        /**
+         * ==========================================
+         * 3. 핵심 UI 헬퍼 및 유효성 관리 로직
+         * ==========================================
+         */
+        
+        // 입력 텍스트 분석하여 정제된 이름 배열 반환
+        function parseNames() {
+            const rawText = document.getElementById("namesInput").value;
+            // 쉼표 및 줄바꿈으로 파싱하고 여백 제거 후 비어있는 값 필터링
+            return rawText
+                .split(/[,\n]+/)
+                .map(name => name.trim())
+                .filter(name => name.length > 0);
+        }
+
+        // 참가자 인원 카운팅 라이브 라벨 갱신
+        function updateCount() {
+            const list = parseNames();
+            document.getElementById("nameCount").innerText = `대기 ${list.length}명`;
+        }
+
+        // 추첨 인원 수 조정 스텝버튼
+        function changeWinnerCount(delta) {
+            const input = document.getElementById("winnerCountInput");
+            let val = parseInt(input.value) || 1;
+            val += delta;
+            if (val < 1) val = 1;
+            input.value = val;
+        }
+
+        // 커스텀 토스트 알럿 띄우기 (Standard alert 완벽 대체)
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            const toastMessage = document.getElementById("toastMessage");
+            toastMessage.innerText = message;
+            
+            toast.classList.remove("opacity-0", "scale-90", "pointer-events-none");
+            toast.classList.add("opacity-100", "scale-100");
+            
+            // 3초 후 페이드 아웃
+            setTimeout(() => {
+                toast.classList.remove("opacity-100", "scale-100");
+                toast.classList.add("opacity-0", "scale-90", "pointer-events-none");
+            }, 3000);
+        }
+
+        // 전체 필드 초기화
+        function resetApp() {
+            document.getElementById("namesInput").value = "";
+            document.getElementById("winnerCountInput").value = "1";
+            updateCount();
+            backToIdle();
+            showToast("모든 설정이 초기화되었습니다.");
+        }
+
+        /**
+         * ==========================================
+         * 4. 메인 추첨 및 고난도 슬롯머신 드럼 롤러
+         * ==========================================
+         */
+        
+        function startDrawing() {
+            const allParticipants = parseNames();
+            const winnerCount = parseInt(document.getElementById("winnerCountInput").value) || 1;
+
+            // 예외처리 경계 검사
+            if (allParticipants.length === 0) {
+                showToast("참가자 명단이 비어 있습니다. 이름을 입력해 주세요!");
+                return;
+            }
+            if (winnerCount > allParticipants.length) {
+                showToast(`추첨 인원(${winnerCount}명)이 총 참가자 수(${allParticipants.length}명)보다 많습니다!`);
+                return;
+            }
+
+            // UI 변경: 대기스크린 숨기고 추첨스크린 노출
+            document.getElementById("stageIdle").classList.add("hidden");
+            document.getElementById("stageResult").classList.add("hidden");
+            
+            const drawingStage = document.getElementById("stageDrawing");
+            drawingStage.classList.remove("hidden");
+            drawingStage.classList.add("flex");
+
+            // 슬롯 구역 클리어
+            const container = document.getElementById("slotsContainer");
+            container.innerHTML = "";
+
+            // 그리드 컬럼 설정 (인원수에 따른 유연한 분배)
+            if (winnerCount === 1) {
+                container.className = "w-full flex justify-center max-h-[400px] overflow-y-auto px-4 py-2";
+            } else {
+                container.className = "w-full grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto px-4 py-2";
+            }
+
+            // 피셔-예이츠 셔플 알고리즘으로 완전 무작위 당첨자 결정
+            const shuffled = [...allParticipants];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            const winners = shuffled.slice(0, winnerCount);
+
+            // 각 당첨 슬롯 머신 생성 및 세팅
+            const reels = [];
+            const durationArr = []; // 각 슬롯의 회전 시간 (시간차 정지로 긴장감 배가)
+
+            for (let s = 0; s < winnerCount; s++) {
+                const winnerName = winners[s];
+                
+                // 가짜 롤링 데이터 생성 (충분한 수의 무작위 이름을 채워 슬롯 회전 눈속임 구현)
+                // 실제 당첨자는 맨 마지막 리스트 끝에 배치함
+                const decoyCount = 35 + (s * 5); // 뒤쪽 슬롯일수록 점진적으로 느리게 멈춤
+                const dummyNames = [];
+                for (let d = 0; d < decoyCount; d++) {
+                    const randName = allParticipants[Math.floor(Math.random() * allParticipants.length)];
+                    dummyNames.push(randName);
+                }
+                dummyNames.push(winnerName); // 핵심: 종착지는 당첨자 이름
+
+                // 슬롯 돔 엘리먼트 빌드
+                const slotId = `slot_${s}`;
+                const reelId = `reel_${s}`;
+                
+                const slotCardHTML = `
+                    <div id="${slotId}" class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-inner group">
+                        <div class="absolute top-2 left-3 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+                            <span class="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">Slot ${s + 1}</span>
+                        </div>
+                        <div class="slot-window w-full flex items-center justify-center relative my-4 overflow-hidden">
+                            <!-- 실제 물리 회전을 할 테이프 릴 -->
+                            <div id="${reelId}" class="slot-reel absolute top-0 left-0 w-full flex flex-col items-center">
+                                ${dummyNames.map(name => `
+                                    <div class="h-20 flex items-center justify-center text-lg md:text-xl font-bold text-slate-400 select-none px-4 truncate max-w-full">
+                                        ${name}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <!-- 포커스 가이드라인 -->
+                            <div class="absolute inset-y-0 w-full border-y border-indigo-500/20 bg-indigo-500/[0.02] pointer-events-none h-20 top-0"></div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', slotCardHTML);
+
+                // CSS 렌더링 동기화를 위해 리플로우 강제 유발
+                const reelElement = document.getElementById(reelId);
+                const itemHeight = 80; // 아이템당 80px 높이
+                const endTranslateY = -((dummyNames.length - 1) * itemHeight);
+                
+                // 애니메이션 소요 시간 설정 (3.5초 ~ 최고 6초 범위)
+                const animationDuration = 3.5 + (s * 0.7); 
+                durationArr.push(animationDuration);
+
+                reels.push({
+                    element: reelElement,
+                    translateY: endTranslateY,
+                    duration: animationDuration,
+                    winner: winnerName
+                });
+            }
+
+            // 오디오 컨텍스트 딜레이 스타트 방지
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // 오버헤드 없이 0.05초 단위 주기로 지속적으로 가짜 틱 굴러가는 소리(드럼롤 모사) 재생
+            let tickCount = 0;
+            const maxTicks = Math.max(...durationArr) * 12; // 소요시간 비례 틱 주기
+            const intervalTime = 80; // 빠른 틱 간격(ms)
+            
+            const soundInterval = setInterval(() => {
+                tickCount++;
+                // 회전 진행도에 따라 사운드 틱 피치/속도에 감쇄 효과를 주어 릴 슬로우 모션 구현
+                let pitch = 600 - (tickCount * 1.5);
+                if (pitch < 150) pitch = 150;
+                playTickSound(pitch, 0.04);
+                
+                if (tickCount >= maxTicks) {
+                    clearInterval(soundInterval);
+                }
+            }, intervalTime);
+
+            // 미세 딜레이 후 각 릴에 동적 하이퍼 가속 변환 적용 (트랜지션 트리거)
+            setTimeout(() => {
+                reels.forEach((reel, idx) => {
+                    reel.element.style.transition = `transform ${reel.duration}s cubic-bezier(0.1, 0.9, 0.2, 1.01)`;
+                    reel.element.style.transform = `translateY(${reel.translateY}px)`;
+                    
+                    // 각 릴이 고유 시간에 정확히 착지 정지하는 이벤트 디스패치
+                    setTimeout(() => {
+                        // 슬롯 멈춤 순간 연출: 테두리를 에메랄드 네온 빛으로 빛냄
+                        const slotCard = document.getElementById(`slot_${idx}`);
+                        if (slotCard) {
+                            slotCard.classList.remove("border-slate-800");
+                            slotCard.classList.add("border-emerald-500", "shadow-neon-emerald");
+                            // 멈출 때 "탁" 하며 걸쇠 걸리는 사운드
+                            playTickSound(800, 0.12);
+                        }
+                    }, reel.duration * 1000);
+                });
+            }, 50);
+
+            // 모든 릴이 끝까지 정지 완료되는 통합 대기 시간
+            const totalWaitTime = Math.max(...durationArr) * 1000 + 200;
+            
+            setTimeout(() => {
+                clearInterval(soundInterval);
+                displayFinalResults(winners);
+            }, totalWaitTime);
+        }
+
+        /**
+         * ==========================================
+         * 5. 결과 시각 발표, 폭죽 연출, 히스토리 갱신
+         * ==========================================
+         */
+        
+        function displayFinalResults(winners) {
+            // UI 단계 전환 (추첨 스크린 -> 최종 결과 노출)
+            document.getElementById("stageDrawing").classList.add("hidden");
+            
+            const resultStage = document.getElementById("stageResult");
+            resultStage.classList.remove("hidden");
+            resultStage.classList.add("flex");
+
+            // 최종 위너 카드 마운트 구역에 바인딩
+            const winnersDisplay = document.getElementById("winnersDisplay");
+            winnersDisplay.innerHTML = "";
+
+            winners.forEach((winner, idx) => {
+                const cardHTML = `
+                    <div class="px-8 py-5 rounded-2xl bg-gradient-to-br from-violet-950/80 to-slate-900/90 border border-violet-500/80 shadow-neon-violet transform scale-95 opacity-0 animate-pop-in relative min-w-[160px]"
+                         style="animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) ${idx * 0.15}s forwards;">
+                        <i class="fa-solid fa-crown text-yellow-400 absolute -top-4 left-1/2 -translate-x-1/2 text-2xl drop-shadow-[0_2px_8px_rgba(250,204,21,0.5)]"></i>
+                        <span class="text-[10px] text-violet-400 tracking-widest font-extrabold uppercase block mb-1">Winner ${idx + 1}</span>
+                        <div class="text-2xl font-black text-slate-100 tracking-wide">${winner}</div>
+                    </div>
+                `;
+                winnersDisplay.insertAdjacentHTML('beforeend', cardHTML);
+            });
+
+            // 1. 축포 터치 기쁨의 팡파르 합성음 가동
+            playFanfareSound();
+
+            // 2. 최고 사양 컨페티(Confetti) 전면 난사 폭격
+            runConfettiShower();
+
+            // 3. 최근 당첨 기록 리스트 등록
+            const now = new Date();
+            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            
+            const newHistoryItem = {
+                id: Date.now(),
+                time: timeString,
+                winners: [...winners]
+            };
+            
+            drawingHistory.unshift(newHistoryItem);
+            // 최신 30개까지만 기록 유지 제한
+            if (drawingHistory.length > 30) {
+                drawingHistory.pop();
+            }
+
+            // 로컬 스토리지 동기화 및 기록 갱신
+            localStorage.setItem("championDrawHistory", JSON.stringify(drawingHistory));
+            renderHistory();
+        }
+
+        // 키프레임 기반 애니메이션 주입을 위한 동적 스타일
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            @keyframes popIn {
+                to {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+            .animate-pop-in {
+                animation-fill-mode: forwards;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // 캔버스 폭죽 쇼 라이브러리 제어
+        function runConfettiShower() {
+            // 좌측에서 폭포 폭발
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { x: 0.1, y: 0.6 }
+            });
+            // 우측에서 폭포 폭발
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { x: 0.9, y: 0.6 }
+            });
+            
+            // 0.25초 차이를 두고 성간 은하 폭발 연출
+            setTimeout(() => {
+                confetti({
+                    particleCount: 200,
+                    spread: 120,
+                    origin: { x: 0.5, y: 0.5 }
+                });
+            }, 250);
+        }
+
+        /**
+         * ==========================================
+         * 6. 기타 네비게이션 및 세컨더리 피처
+         * ==========================================
+         */
+
+        // 동일 옵션으로 곧바로 다시 롤링 시작
+        function restartDrawingSame() {
+            startDrawing();
+        }
+
+        // 초기 수동 대기 홈스크린으로 복귀
+        function backToIdle() {
+            document.getElementById("stageResult").classList.add("hidden");
+            document.getElementById("stageDrawing").classList.add("hidden");
+            
+            const idleStage = document.getElementById("stageIdle");
+            idleStage.classList.remove("hidden");
+            idleStage.classList.add("flex");
+        }
+
+        // 최근 당첨 이력 렌더링
+        function renderHistory() {
+            const listEl = document.getElementById("historyList");
+            const emptyMsg = document.getElementById("emptyHistoryMsg");
+
+            if (drawingHistory.length === 0) {
+                listEl.innerHTML = "";
+                listEl.appendChild(emptyMsg);
+                return;
+            }
+
+            if (emptyMsg) emptyMsg.remove();
+
+            listEl.innerHTML = drawingHistory.map(item => `
+                <div class="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-1.5 hover:border-slate-700/80 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
+                            <i class="fa-regular fa-clock"></i> ${item.time}
+                        </span>
+                        <span class="text-[10px] px-1.5 py-0.5 bg-violet-950/50 text-violet-300 rounded border border-violet-800/50">
+                            총 ${item.winners.length}명
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${item.winners.map(winner => `
+                            <span class="px-2 py-0.5 bg-slate-900 border border-slate-800/80 rounded text-xs font-bold text-slate-200">
+                                ${winner}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 모든 당첨 이력 삭제
+        function clearHistory() {
+            drawingHistory = [];
+            localStorage.removeItem("championDrawHistory");
+            renderHistory();
+            showToast("모든 추첨 이력 기록이 삭제되었습니다.");
+        }
+    </script>
+</body>
+</html>
